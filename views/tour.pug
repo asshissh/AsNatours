@@ -1,0 +1,167 @@
+extends base
+include _reviewCard
+
+block append head
+  script(src='https://api.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.js')
+  link(href='https://api.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.css' rel='stylesheet')
+  script(src="https://js.stripe.com/v3/")
+  script(type='module', src='/js/wishlist.js')
+
+  
+
+
+mixin overviewBox(label, text, icon)
+  .overview-box__detail
+    svg.overview-box__icon
+      use(xlink:href=`/img/icons.svg#icon-${icon}`)
+    span.overview-box__label= label
+    span.overview-box__text= text
+
+block content
+  section.section-header
+    .header__hero
+      .header__hero-overlay &nbsp;
+      img.header__hero-img(src=`/img/tours/${tour.imageCover}`, alt=`${tour.name}`)
+
+    .heading-box
+      h1.heading-primary
+        span= `${tour.name} tour`
+      .heading-box__group
+        .heading-box__detail
+          svg.heading-box__icon
+            use(xlink:href='/img/icons.svg#icon-clock')
+          span.heading-box__text= `${tour.duration} days`
+        .heading-box__detail
+          svg.heading-box__icon
+            use(xlink:href='/img/icons.svg#icon-map-pin')
+          span.heading-box__text= tour.startLocation.description
+
+  section.section-description
+    .overview-box
+      div
+        .overview-box__group
+          h2.heading-secondary.ma-bt-lg Quick facts
+
+          - const date = tour.startDates[0].toLocaleString('en-us', {month: 'long', year: 'numeric'})
+          +overviewBox('Next date', date, 'calendar')
+          +overviewBox('Difficulty', tour.difficulty, 'trending-up')
+          +overviewBox('Participants', `${tour.maxGroupSize} people`, 'user')
+          +overviewBox('Rating', `${tour.ratingsAverage} / 5`, 'star')
+
+        .overview-box__group
+          h2.heading-secondary.ma-bt-lg Your tour guides
+
+          each guide in tour.guides
+            .overview-box__detail
+              img.overview-box__img(src=`/img/users/${guide.photo}`, alt=`${guide.name}`)
+
+              - if (guide.role === 'lead-guide')
+                span.overview-box__label Lead guide
+              - if (guide.role === 'guide')
+                span.overview-box__label Tour guide
+              span.overview-box__text= guide.name
+
+    .description-box
+      h2.heading-secondary.ma-bt-lg= `About ${tour.name} tour`
+      - const parapraphs = tour.description.split('\n');
+      each p in parapraphs
+        p.description__text= p
+
+  section.section-pictures
+    each img, i in tour.images
+      .picture-box
+        img.picture-box__img(src=`/img/tours/${img}`, alt=`The Park Camper Tour ${i + 1}`, class=`picture-box__img--${i + 1}`)
+
+  section.section-map
+    #map(data-locations=`${JSON.stringify(tour.locations)}`)
+
+  section.section-reviews
+    .reviews
+      each review in tour.reviews
+        +reviewCard(review)
+
+  section.section-cta
+    .cta
+      .cta__img.cta__img--logo
+        img(src='/img/logo-white.png', alt='Natours logo')
+      img.cta__img.cta__img--1(src=`/img/tours/${tour.images[1]}`, alt='Tour picture')
+      img.cta__img.cta__img--2(src=`/img/tours/${tour.images[2]}`, alt='Tour picture')
+      .cta__content
+        h2.heading-secondary What are you waiting for?
+        p.cta__text= `${tour.duration} days. 1 adventure. Infinite memories. Make it yours today!`
+        
+        if user
+          .cta__actions
+            button.btn.btn--green.span-all-rows#book-tour(data-tour-id=`${tour.id}`) Book tour now!
+            button.btn.btn--white.wishlist-btn#wishlist-btn(data-tour-id=`${tour.id}`)
+              svg.wishlist-btn__icon
+                use(xlink:href='/img/icons.svg#icon-heart')
+              span.wishlist-btn__text Add to Wishlist
+        else
+          a.btn.btn--green.span-all-rows(href='/login') Log in to book tour
+          
+  //- Backup booking script
+  if user
+    script.
+      // Backup booking functionality - runs immediately
+      console.log('🔧 Backup booking script loading...');
+      
+      function setupBackupBooking() {
+        const bookBtn = document.getElementById('book-tour');
+        if (!bookBtn) return false;
+        
+        console.log('✅ Backup: Found booking button');
+        
+        // Only setup if no onclick handler exists
+        if (!bookBtn.onclick) {
+          console.log('🔄 Backup: Setting up booking...');
+          
+          bookBtn.onclick = async function(e) {
+            e.preventDefault();
+            console.log('🎯 BACKUP BOOKING TRIGGERED!');
+            
+            const tourId = this.dataset.tourId;
+            if (!tourId) { alert('No tour ID!'); return; }
+            
+            this.textContent = 'Processing...';
+            this.disabled = true;
+            
+            try {
+              const res = await fetch('/api/v1/booking/checkout-session/' + tourId, {
+                method: 'GET',
+                credentials: 'include'
+              });
+              const data = await res.json();
+              
+              if (data.status === 'success' && data.session) {
+                const stripe = Stripe('pk_test_51S7VTkIzfSrI1uRsKz5vMB5M2efDrjFtPPIqlfc4lp8F11sHjliViQuUDYriYafft7xUI5u1wbh0jVbay9YgN2w900dB0BaYxQ');
+                await stripe.redirectToCheckout({ sessionId: data.session.id });
+              } else {
+                throw new Error('Failed to create session');
+              }
+            } catch (err) {
+              this.textContent = 'Book tour now!';
+              this.disabled = false;
+              alert('Booking failed: ' + err.message);
+            }
+          };
+          
+          console.log('✅ Backup booking ready!');
+          return true;
+        }
+        return false;
+      }
+      
+      // Try immediately
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupBackupBooking);
+      } else {
+        setupBackupBooking();
+      }
+      
+      // Also try after a delay as final backup
+      setTimeout(() => {
+        if (!setupBackupBooking()) {
+          console.log('ℹ️ Backup not needed - button already working');
+        }
+      }, 2000);

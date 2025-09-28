@@ -1,0 +1,15 @@
+extends base
+
+block content
+  h1.heading-secondary My Wishlist
+
+  if tours.length
+    .tours
+      each tour in tours
+        .tour-card
+          h3= tour.name
+          p= tour.summary
+          img.tour-card__img(src=`/img/tours/${tour.imageCover}`, alt=tour.name)
+          p Price: $#{tour.price}
+  else
+    p You have no tours in your wishlist yet.
