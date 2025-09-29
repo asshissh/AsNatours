@@ -1,2 +1,9 @@
-# Handle line endings consistently
-* text=auto eol=lf
+# Enforce consistent LF line endings
+* text=auto
+
+# Force LF for source code and config files
+*.js   text eol=lf
+*.json text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.md   text eol=lf
